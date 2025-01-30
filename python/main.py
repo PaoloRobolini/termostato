@@ -1,11 +1,11 @@
 import serial
 import dearpygui.dearpygui as dpg
 import multiprocessing as mp
-import imgui
+# import imgui
 
 def read_data(q):
     # crea la seriale
-    SERIALE = "COM5"
+    SERIALE = "COM3"
     ser = serial.Serial(SERIALE, 9600)
 
     while True:
@@ -24,8 +24,7 @@ def read_data(q):
 
         q.put([h, t])
 
-    ser.close() # chiudi la seriale
-
+    # ser.close() # chiudi la seriale
 
 
 if __name__ == '__main__':
@@ -33,18 +32,22 @@ if __name__ == '__main__':
     read_process = mp.Process(target=read_data, args=(queue,))
     read_process.start()
 
-    data = queue.get()
-
-    #creazione gui
+    # creazione gui
     dpg.create_context()
-    dpg.create_viewport(title='Custom Title', width=600, height=300)
-    dpg.setup_dearpygui()
+    dpg.create_viewport(title='Data Reader')
 
     with dpg.window(label="Data Reader"):
         dpg.add_text("Data Reader")
+        dpg.add_text("", tag="data")
 
+    dpg.setup_dearpygui()
     dpg.show_viewport()
 
     while dpg.is_dearpygui_running():
-        dpg.render_dearpygui_frame()
+        try:
+            data = queue.get_nowait()
+            dpg.set_value("data", data)
+        except:
+            continue
 
+        dpg.render_dearpygui_frame()
