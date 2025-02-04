@@ -43,12 +43,14 @@ if __name__ == '__main__':
 
     # creazione gui
     dpg.create_context()
-    dpg.create_viewport(title='Data Reader')
+    dpg.create_viewport(title='Termostato', width=1600, height=900)
 
     # aggiunta delle caselle di testo contenenti le varie informazioni
-    with dpg.window(label="Data Reader"):
+    with dpg.window(tag="Primary Window"):
         # aggiunta dati
-        dpg.add_text("", tag="data")
+        dpg.add_text("", tag="temperature")
+        dpg.add_text("", tag="humidity")
+        dpg.add_text("", tag="leds")
 
         with dpg.plot(label="Temperature Variation", height=400, width=800, tag="temperaturePlot"):
             # dichiarazione assi
@@ -79,6 +81,7 @@ if __name__ == '__main__':
     # inizializzazione gui
     dpg.setup_dearpygui()
     dpg.show_viewport()
+    dpg.set_primary_window("Primary Window", True)
 
     # aggiornamento gui
     while dpg.is_dearpygui_running():
@@ -94,8 +97,23 @@ if __name__ == '__main__':
             humidity.append(data[0])
             humidity.pop(0)
 
-            dpg.set_value("data", data)
-            dpg.set_value('temperatureData', [intervals, temperature])
+            stato_led_verde = False
+            stato_led_rosso = False
+
+            if 27 >= data[1] >= 25:
+                stato_led_verde = True
+            elif data[1] > 27:
+                stato_led_rosso = True
+                stato_led_verde = False
+            else:
+                stato_led_rosso = False
+
+
+            dpg.set_value("temperature", f"Temperature: {data[1]} °C")
+            dpg.set_value("humidity", f"Humidity: {data[0]} %")
+            dpg.set_value("leds", f"Led Verde: {stato_led_verde} | Led Rosso: {stato_led_rosso}")
+
+            dpg.set_value("temperatureData", [intervals, temperature])
             dpg.set_value("humidityData", [intervals, humidity])
 
         dpg.render_dearpygui_frame()
