@@ -49,5 +49,4 @@ void loop() {
     int SOGLIA_INFERIORE = 20;
  
     accendiLed(temp, SOGLIA_INFERIORE, SOGLIA_SUPERIORE);
- 
 }

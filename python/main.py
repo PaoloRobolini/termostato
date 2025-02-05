@@ -1,13 +1,19 @@
 from queue import Empty
+from datetime import datetime
 
 import serial
+import json
 import dearpygui.dearpygui as dpg
 import multiprocessing as mp
+
+global temperature
+global humidity
+global time
 
 
 def read_data(q):
     # crea la seriale
-    porta_seriale = "COM3"
+    porta_seriale = "COM10"
     ser = serial.Serial(porta_seriale, 9600)
 
     while True:
@@ -24,8 +30,28 @@ def read_data(q):
         h = int(h)
         t = int(t)
 
+        # mette le due variabili nella coda del processo
         q.put([h, t])
 
+
+def save_data():
+    data_save = []
+
+    for item in range(60):
+        temp = {
+            "time": time[item],
+            "temperature": temperature[item],
+            "humidity": humidity[item]
+        }
+        data_save.append(temp)
+
+    file_name = datetime.now().strftime("%Y%m%d%H%M") + ".json"
+    with open(file_name, "w") as outfile:
+        json.dump(data_save, outfile,indent=4, ensure_ascii=False)
+
+
+SOGLIA_INFERIORE = 25
+SOGLIA_SUPERIORE = 27
 
 if __name__ == '__main__':
     # creazione coda per la comunicazione dei processi
@@ -39,7 +65,8 @@ if __name__ == '__main__':
     data = [0, 0]
     temperature = [0 for i in range(60)]
     humidity = [0 for i in range(60)]
-    intervals = [i for i in range(60)]
+    time = ["NONE" for i in range(60)]
+    intervals = [i for i in range(1, 61)]
 
     # creazione gui
     dpg.create_context()
@@ -52,7 +79,7 @@ if __name__ == '__main__':
         dpg.add_text("", tag="humidity")
         dpg.add_text("", tag="leds")
 
-        with dpg.plot(label="Temperature Variation", height=400, width=800, tag="temperaturePlot"):
+        with dpg.plot(label="Temperature Variation", height=400, width=1000, tag="temperaturePlot"):
             # dichiarazione assi
             dpg.add_plot_axis(dpg.mvXAxis, label="time (s)", tag="timeAxis1")
             dpg.add_plot_axis(dpg.mvYAxis, label="temperature (C)", tag="temperatureAxis")
@@ -65,7 +92,7 @@ if __name__ == '__main__':
             dpg.add_line_series(temperature, intervals, parent="temperatureAxis", tag="temperatureData",
                                 label="Temperature")
 
-        with dpg.plot(label="Humidity Variation", height=400, width=800, tag="humidityPlot"):
+        with dpg.plot(label="Humidity Variation", height=400, width=1000, tag="humidityPlot"):
             # dichiarazione assi
             dpg.add_plot_axis(dpg.mvXAxis, label="time (s)", tag="timeAxis2")
             dpg.add_plot_axis(dpg.mvYAxis, label="humidity (%)", tag="humidityAxis")
@@ -77,6 +104,9 @@ if __name__ == '__main__':
             # aggiunta delle linee
             dpg.add_line_series(temperature, intervals, parent="humidityAxis", tag="humidityData",
                                 label="Humidity")
+
+        dpg.add_button(enabled=True, label="Save the last 60 seconds", tag="saveButton",
+                       callback=save_data, width=400, height=100)
 
     # inizializzazione gui
     dpg.setup_dearpygui()
@@ -97,17 +127,23 @@ if __name__ == '__main__':
             humidity.append(data[0])
             humidity.pop(0)
 
+            time.append(datetime.now().strftime("%H:%M:%S"))
+            time.pop(0)
+
             stato_led_verde = False
             stato_led_rosso = False
 
-            if 27 >= data[1] >= 25:
+            if SOGLIA_SUPERIORE >= data[1] > SOGLIA_INFERIORE:
                 stato_led_verde = True
-            elif data[1] > 27:
-                stato_led_rosso = True
-                stato_led_verde = False
-            else:
                 stato_led_rosso = False
 
+            elif data[1] > SOGLIA_SUPERIORE:
+                stato_led_verde = False
+                stato_led_rosso = True
+
+            else:
+                stato_led_verde = False
+                stato_led_rosso = False
 
             dpg.set_value("temperature", f"Temperature: {data[1]} °C")
             dpg.set_value("humidity", f"Humidity: {data[0]} %")
@@ -117,6 +153,5 @@ if __name__ == '__main__':
             dpg.set_value("humidityData", [intervals, humidity])
 
         dpg.render_dearpygui_frame()
-
 
     dpg.destroy_context()
