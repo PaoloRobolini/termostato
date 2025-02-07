@@ -1,6 +1,8 @@
 from queue import Empty
 from datetime import datetime
+from pathlib import Path
 
+import sys
 import serial
 import json
 import dearpygui.dearpygui as dpg
@@ -12,21 +14,21 @@ global time
 
 
 def read_data(q):
-    # crea la seriale
-    porta_seriale = "COM10"
+    # dichiarazione della porta seriale
+    porta_seriale = "COM3"
     ser = serial.Serial(porta_seriale, 9600)
 
     while True:
-        # legge i dati (o meglio, legge i byte di dati)
+        # legge i dati dalla porta seriale come bit
         serial_data = ser.readline()
 
-        # li converte in una stringa utf-8
+        # converte i bit letti in caratteri utf-8
         numbered_data = serial_data.decode("utf-8")
 
-        # mette in due variabili, T e H come arduino
+        # mette i dati in due varabili t (temperatura) ed h (umidità)
         t, h = numbered_data.split(' ')
 
-        # converte in interi
+        # converte le due variabili in stringhe
         h = int(h)
         t = int(t)
 
@@ -35,8 +37,10 @@ def read_data(q):
 
 
 def save_data():
+    # dichiarazione lista dati da salvare
     data_save = []
 
+    # riempimento della lista con i dati
     for item in range(60):
         temp = {
             "time": time[item],
@@ -45,13 +49,17 @@ def save_data():
         }
         data_save.append(temp)
 
-    file_name = datetime.now().strftime("%Y%m%d%H%M") + ".json"
+    # salvataggio su file JSON
+    print("saving data")
+    file_name = Path.cwd().parent / ("logs/" + datetime.now().strftime("%Y-%m-%d-%H%M") + ".json")
     with open(file_name, "w") as outfile:
-        json.dump(data_save, outfile,indent=4, ensure_ascii=False)
+        json.dump(data_save, outfile, indent=4, ensure_ascii=False)
 
 
-SOGLIA_INFERIORE = 25
-SOGLIA_SUPERIORE = 27
+def exit_program():
+    print("exiting program")
+    sys.exit(0)
+
 
 if __name__ == '__main__':
     # creazione coda per la comunicazione dei processi
@@ -61,12 +69,16 @@ if __name__ == '__main__':
     read_process = mp.Process(target=read_data, args=(queue,))
     read_process.start()
 
-    # dichiarazione lista dei dati
+    # dichiarazione liste dei dati
     data = [0, 0]
     temperature = [0 for i in range(60)]
     humidity = [0 for i in range(60)]
     time = ["NONE" for i in range(60)]
     intervals = [i for i in range(1, 61)]
+
+    # dichiarazione soglie per indicare lo stato dei led
+    SOGLIA_INFERIORE = 25
+    SOGLIA_SUPERIORE = 27
 
     # creazione gui
     dpg.create_context()
@@ -105,8 +117,11 @@ if __name__ == '__main__':
             dpg.add_line_series(temperature, intervals, parent="humidityAxis", tag="humidityData",
                                 label="Humidity")
 
+        # aggiunta bottone di salvataggio
         dpg.add_button(enabled=True, label="Save the last 60 seconds", tag="saveButton",
                        callback=save_data, width=400, height=100)
+
+        dpg.add_button(enabled=True, label="Exit", tag="exitButton", callback=exit_program, width=400, height=100)
 
     # inizializzazione gui
     dpg.setup_dearpygui()
@@ -115,29 +130,31 @@ if __name__ == '__main__':
 
     # aggiornamento gui
     while dpg.is_dearpygui_running():
+        # prende i dati dalla coda se essa non è vuota
         if not queue.empty():
             try:
                 data = queue.get(block=False)
             except Empty:
                 continue
 
+            # inserisce la temperatura nella lista
             temperature.append(data[1])
             temperature.pop(0)
 
+            # inserisce l'umidità nella lista
             humidity.append(data[0])
             humidity.pop(0)
 
-            time.append(datetime.now().strftime("%H:%M:%S"))
+            # inserisce il tempo di orologio corrente nella lista
+            time.append(datetime.now().strftime("%H:%M:%S:%ms"))
             time.pop(0)
 
-            stato_led_verde = False
-            stato_led_rosso = False
-
-            if SOGLIA_SUPERIORE >= data[1] > SOGLIA_INFERIORE:
+            # if per la decisione dello stato dei led rosso e verde
+            if SOGLIA_SUPERIORE > data[1] > SOGLIA_INFERIORE:
                 stato_led_verde = True
                 stato_led_rosso = False
 
-            elif data[1] > SOGLIA_SUPERIORE:
+            elif data[1] >= SOGLIA_SUPERIORE:
                 stato_led_verde = False
                 stato_led_rosso = True
 
@@ -145,13 +162,16 @@ if __name__ == '__main__':
                 stato_led_verde = False
                 stato_led_rosso = False
 
+            # aggiornamento dati
             dpg.set_value("temperature", f"Temperature: {data[1]} °C")
             dpg.set_value("humidity", f"Humidity: {data[0]} %")
             dpg.set_value("leds", f"Led Verde: {stato_led_verde} | Led Rosso: {stato_led_rosso}")
 
+            # aggiornamento grafici
             dpg.set_value("temperatureData", [intervals, temperature])
             dpg.set_value("humidityData", [intervals, humidity])
 
+        # renderizza il frame corrente della gui
         dpg.render_dearpygui_frame()
 
     dpg.destroy_context()
