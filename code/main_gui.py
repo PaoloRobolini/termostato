@@ -13,11 +13,15 @@ global humidity
 global time
 
 
+with dpg.font_registry():
+    # Aggiunta di un font con dimensione 20
+    default_font = dpg.add_font("NoName37.otf", 20)
+
 def read_data(q):
     # dichiarazione della porta seriale
     porta_seriale = "COM3"
     ser = serial.Serial(porta_seriale, 9600)
-
+    color = (255, 255, 255, 255)
     while True:
         # legge i dati dalla porta seriale come bit
         serial_data = ser.readline()
@@ -28,10 +32,13 @@ def read_data(q):
         # mette i dati in due varabili t (temperatura) ed h (umidità)
         t, h = numbered_data.split(' ')
 
-        # converte le due variabili da stringhe a interi
+        # converte le due variabili in stringhe
         h = int(h)
         t = int(t)
-
+        if h > SOGLIA_SUPERIORE:
+            color = (255,0,0,255)
+        elif h > SOGLIA_INFERIORE:
+            color = (0,255,0,255)
         # mette le due variabili nella coda del processo
         q.put([h, t])
 
@@ -56,6 +63,11 @@ def save_data():
         json.dump(data_save, outfile, indent=4, ensure_ascii=False)
 
 
+def exit_program():
+    print("exiting program")
+    sys.exit(0)
+
+
 if __name__ == '__main__':
     # creazione coda per la comunicazione dei processi
     queue = mp.Queue()
@@ -77,7 +89,7 @@ if __name__ == '__main__':
 
     # creazione gui
     dpg.create_context()
-    dpg.create_viewport(title='Termostato', width=1600, height=900)
+    dpg.create_viewport(title='Termostato', width=1450, height=950)
 
     # aggiunta delle caselle di testo contenenti le varie informazioni
     with dpg.window(tag="Primary Window"):
@@ -86,13 +98,15 @@ if __name__ == '__main__':
         dpg.add_text("", tag="humidity")
         dpg.add_text("", tag="leds")
 
+        dpg.draw_circle(center=(980, 108), radius=8, color=(0, 0, 0, 255), thickness=2, fill=Color)
+
         with dpg.plot(label="Temperature Variation", height=400, width=1000, tag="temperaturePlot"):
             # dichiarazione assi
             dpg.add_plot_axis(dpg.mvXAxis, label="time (s)", tag="timeAxis1")
             dpg.add_plot_axis(dpg.mvYAxis, label="temperature (C)", tag="temperatureAxis")
 
             # impostazione limiti degli assi
-            dpg.set_axis_limits("timeAxis1", 0, 60)
+            dpg.set_axis_limits("timeAxis1", -60, 0)
             dpg.set_axis_limits("temperatureAxis", -20, 50)
 
             # aggiunta delle linee
@@ -105,7 +119,7 @@ if __name__ == '__main__':
             dpg.add_plot_axis(dpg.mvYAxis, label="humidity (%)", tag="humidityAxis")
 
             # impostazione limiti degli assi
-            dpg.set_axis_limits("timeAxis2", 0, 60)
+            dpg.set_axis_limits("timeAxis2", -60, 0)
             dpg.set_axis_limits("humidityAxis", 0, 100)
 
             # aggiunta delle linee
@@ -114,7 +128,10 @@ if __name__ == '__main__':
 
         # aggiunta bottone di salvataggio
         dpg.add_button(enabled=True, label="Save the last 60 seconds", tag="saveButton",
-                       callback=save_data, width=400, height=100)
+                       callback=save_data, width=400, height=100, pos=(1012, 98))
+        dpg.add_button(enabled=True, label="Exit", tag="exitButton", callback=exit_program, width=400, height=100,
+                            pos=(1012, 202))
+        dpg.bind_font(default_font)
 
 
     # inizializzazione gui
