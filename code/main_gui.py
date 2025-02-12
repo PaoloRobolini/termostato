@@ -28,7 +28,7 @@ def read_data(q):
         # mette i dati in due varabili t (temperatura) ed h (umidità)
         t, h = numbered_data.split(' ')
 
-        # converte le due variabili in stringhe
+        # converte le due variabili da stringhe a interi
         h = int(h)
         t = int(t)
 
@@ -54,11 +54,6 @@ def save_data():
     file_name = Path.cwd().parent / ("logs/" + datetime.now().strftime("%Y-%m-%d-%H%M") + ".json")
     with open(file_name, "w") as outfile:
         json.dump(data_save, outfile, indent=4, ensure_ascii=False)
-
-
-def exit_program():
-    print("exiting program")
-    sys.exit(0)
 
 
 if __name__ == '__main__':
@@ -121,7 +116,6 @@ if __name__ == '__main__':
         dpg.add_button(enabled=True, label="Save the last 60 seconds", tag="saveButton",
                        callback=save_data, width=400, height=100)
 
-        dpg.add_button(enabled=True, label="Exit", tag="exitButton", callback=exit_program, width=400, height=100)
 
     # inizializzazione gui
     dpg.setup_dearpygui()
