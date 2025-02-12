@@ -2,7 +2,6 @@ from queue import Empty
 from datetime import datetime
 from pathlib import Path
 
-import sys
 import serial
 import json
 import dearpygui.dearpygui as dpg
@@ -11,17 +10,16 @@ import multiprocessing as mp
 global temperature
 global humidity
 global time
+global colorR
+global colorV
 
-
-with dpg.font_registry():
-    # Aggiunta di un font con dimensione 20
-    default_font = dpg.add_font("NoName37.otf", 20)
+colorR = (0,255,0,255)
+colorV = (255,0,0,55)
 
 def read_data(q):
     # dichiarazione della porta seriale
-    porta_seriale = "COM3"
+    porta_seriale = "COM7"
     ser = serial.Serial(porta_seriale, 9600)
-    color = (255, 255, 255, 255)
     while True:
         # legge i dati dalla porta seriale come bit
         serial_data = ser.readline()
@@ -35,10 +33,7 @@ def read_data(q):
         # converte le due variabili in stringhe
         h = int(h)
         t = int(t)
-        if h > SOGLIA_SUPERIORE:
-            color = (255,0,0,255)
-        elif h > SOGLIA_INFERIORE:
-            color = (0,255,0,255)
+
         # mette le due variabili nella coda del processo
         q.put([h, t])
 
@@ -59,13 +54,14 @@ def save_data():
     # salvataggio su file JSON
     print("saving data")
     file_name = Path.cwd().parent / ("logs/" + datetime.now().strftime("%Y-%m-%d-%H%M") + ".json")
-    with open(file_name, "w") as outfile:
+    with open(file_name, 'w') as outfile:
         json.dump(data_save, outfile, indent=4, ensure_ascii=False)
 
 
 def exit_program():
     print("exiting program")
-    sys.exit(0)
+    dpg.stop_dearpygui()
+    exit()
 
 
 if __name__ == '__main__':
@@ -84,7 +80,7 @@ if __name__ == '__main__':
     intervals = [i for i in range(1, 61)]
 
     # dichiarazione soglie per indicare lo stato dei led
-    SOGLIA_INFERIORE = 25
+    SOGLIA_INFERIORE = 23
     SOGLIA_SUPERIORE = 27
 
     # creazione gui
@@ -98,7 +94,6 @@ if __name__ == '__main__':
         dpg.add_text("", tag="humidity")
         dpg.add_text("", tag="leds")
 
-        dpg.draw_circle(center=(980, 108), radius=8, color=(0, 0, 0, 255), thickness=2, fill=Color)
 
         with dpg.plot(label="Temperature Variation", height=400, width=1000, tag="temperaturePlot"):
             # dichiarazione assi
@@ -106,7 +101,7 @@ if __name__ == '__main__':
             dpg.add_plot_axis(dpg.mvYAxis, label="temperature (C)", tag="temperatureAxis")
 
             # impostazione limiti degli assi
-            dpg.set_axis_limits("timeAxis1", -60, 0)
+            dpg.set_axis_limits("timeAxis1", 0, 60)
             dpg.set_axis_limits("temperatureAxis", -20, 50)
 
             # aggiunta delle linee
@@ -119,19 +114,22 @@ if __name__ == '__main__':
             dpg.add_plot_axis(dpg.mvYAxis, label="humidity (%)", tag="humidityAxis")
 
             # impostazione limiti degli assi
-            dpg.set_axis_limits("timeAxis2", -60, 0)
+            dpg.set_axis_limits("timeAxis2", 0, 60)
             dpg.set_axis_limits("humidityAxis", 0, 100)
 
             # aggiunta delle linee
             dpg.add_line_series(temperature, intervals, parent="humidityAxis", tag="humidityData",
                                 label="Humidity")
 
+
         # aggiunta bottone di salvataggio
         dpg.add_button(enabled=True, label="Save the last 60 seconds", tag="saveButton",
-                       callback=save_data, width=400, height=100, pos=(1012, 98))
+                       callback=save_data, width=400, height=100, pos=(1012, 78))
         dpg.add_button(enabled=True, label="Exit", tag="exitButton", callback=exit_program, width=400, height=100,
-                            pos=(1012, 202))
-        dpg.bind_font(default_font)
+                            pos=(1012, 182))
+        c1 = dpg.draw_circle(center=(960, 85), radius=8, color=(0, 0, 0, 255), thickness=1, fill=colorV, tag="ledR")
+        c2 = dpg.draw_circle(center=(980, 85), radius=8, color=(0, 0, 0, 255), thickness=1, fill=colorR, tag="ledV")
+
 
 
     # inizializzazione gui
@@ -156,6 +154,7 @@ if __name__ == '__main__':
             humidity.append(data[0])
             humidity.pop(0)
 
+
             # inserisce il tempo di orologio corrente nella lista
             time.append(datetime.now().strftime("%H:%M:%S:%ms"))
             time.pop(0)
@@ -164,16 +163,21 @@ if __name__ == '__main__':
             if SOGLIA_SUPERIORE > data[1] > SOGLIA_INFERIORE:
                 stato_led_verde = True
                 stato_led_rosso = False
-
+                dpg.configure_item(c1, fill=(0, 255, 0, 255))
+                dpg.configure_item(c2 ,fill=(55,0,0,55))
             elif data[1] >= SOGLIA_SUPERIORE:
                 stato_led_verde = False
                 stato_led_rosso = True
-
+                dpg.configure_item(c1, fill=(0, 55, 0, 55))
+                dpg.configure_item(c2 ,fill=(255,0,0,255))
             else:
                 stato_led_verde = False
                 stato_led_rosso = False
+                dpg.configure_item(c1, fill=(0, 55, 0, 55))
+                dpg.configure_item(c2 ,fill=(55,0,0,55))
 
             # aggiornamento dati
+
             dpg.set_value("temperature", f"Temperature: {data[1]} °C")
             dpg.set_value("humidity", f"Humidity: {data[0]} %")
             dpg.set_value("leds", f"Led Verde: {stato_led_verde} | Led Rosso: {stato_led_rosso}")
@@ -181,6 +185,9 @@ if __name__ == '__main__':
             # aggiornamento grafici
             dpg.set_value("temperatureData", [intervals, temperature])
             dpg.set_value("humidityData", [intervals, humidity])
+
+
+
 
         # renderizza il frame corrente della gui
         dpg.render_dearpygui_frame()
