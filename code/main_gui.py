@@ -167,16 +167,21 @@ if __name__ == '__main__':
             if SOGLIA_SUPERIORE > data[1] > SOGLIA_INFERIORE:
                 stato_led_verde = True
                 stato_led_rosso = False
+
                 dpg.configure_item(c1, fill=(0, 255, 0, 255))
                 dpg.configure_item(c2, fill=(55, 0, 0, 55))
+
             elif data[1] >= SOGLIA_SUPERIORE:
                 stato_led_verde = False
                 stato_led_rosso = True
+
                 dpg.configure_item(c1, fill=(0, 55, 0, 55))
                 dpg.configure_item(c2, fill=(255, 0, 0, 255))
+
             else:
                 stato_led_verde = False
                 stato_led_rosso = False
+
                 dpg.configure_item(c1, fill=(0, 55, 0, 55))
                 dpg.configure_item(c2, fill=(55, 0, 0, 55))
 
@@ -192,4 +197,5 @@ if __name__ == '__main__':
         # renderizza il frame corrente della gui
         dpg.render_dearpygui_frame()
 
+    dpg.destroy_context()
     exit()
