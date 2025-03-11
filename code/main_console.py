@@ -1,7 +1,7 @@
 import serial
 
 # crea la seriale
-ser = serial.Serial("COM4", 9600)
+ser = serial.Serial("COM7", 9600)
 
 while True:
     print("sto leggendo...")
